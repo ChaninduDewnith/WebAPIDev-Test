@@ -109,5 +109,4 @@ Response: an array of ping objects belonging to the requested vehicle.
 5. Implement the vehicle ping route.
 6. Test the API with sample requests using curl or a browser.
 
-## 7. Notes
-This project focuses on the basics of routing, JSON response handling, and reading from a static data source. It is ideal for beginners learning API design and Express.js.
+
