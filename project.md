@@ -1,9 +1,9 @@
 # Project Documentation
 
 ## 1. Business Context
-This project is a simple REST API for managing and retrieving geographic and vehicle-related data. It is designed to expose read-only endpoints for provinces, districts, stations, vehicles, and vehicle pings using sample data from a local JSON file.
+This project is a simple REST API for a tuk-tuk tracking system. It provides access to geographic and fleet-related data such as provinces, districts, stations, vehicles, and vehicle location pings.
 
-The API is intended for learning and demonstration purposes, showing how a basic Express.js application can serve structured data without a database or authentication layer.
+The system helps stakeholders view the operational areas of tuk-tuks and track their recent movement history using record data.
 
 ## 2. Assumptions and Clarifications
 - The API is read-only and does not support create, update, or delete operations.
