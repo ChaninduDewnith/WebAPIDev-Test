@@ -1,16 +1,17 @@
 const express = require("express");
-const { data, errors } = require("./utils");
+const { getDB, errors } = require("./utils");
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
-    res.json(data.stations);
+router.get("/", async (req, res) => {
+    const db = await getDB();
+    const stations = await db.collection("stations").find().toArray();
+    res.json(stations);
 });
 
-router.get("/:id", (req, res) => {
-    const station = data.stations.find(
-        s => s.station_id === req.params.id
-    );
+router.get("/:id", async (req, res) => {
+    const db = await getDB();
+    const station = await db.collection("stations").findOne({ station_id: req.params.id });
     if (!station) return res.status(404).json(errors.stationNotFound);
     res.json(station);
 });

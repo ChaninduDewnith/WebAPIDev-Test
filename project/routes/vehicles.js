@@ -1,39 +1,38 @@
 const express = require("express");
-const { data, errors, normalizeVehicleKeyId, deviceKeys, lastPing, resolveVehicleId } = require("./utils");
+const { getDB, getDeviceKeys, normalizeVehicleKeyId, lastPing, resolveVehicleId, errors } = require("./utils");
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
-    res.json(data.vehicles);
+router.get("/", async (req, res) => {
+    const db = await getDB();
+    const vehicles = await db.collection("vehicles").find().toArray();
+    res.json(vehicles);
 });
 
-router.get("/:id", (req, res) => {
-    const vehicle = data.vehicles.find(
-        v => v.vehicle_id === req.params.id
-    );
+router.get("/:id", async (req, res) => {
+    const db = await getDB();
+    const vehicle = await db.collection("vehicles").findOne({ vehicle_id: req.params.id });
 
     if (!vehicle) return res.status(404).json(errors.vehicleNotFound);
 
     res.json({
         ...vehicle,
-        last_ping: lastPing(req.params.id)
+        last_ping: await lastPing(req.params.id)
     });
 });
 
-router.get("/:id/pings", (req, res) => {
-    const vehicle = data.vehicles.find(
-        v => v.vehicle_id === req.params.id
-    );
+router.get("/:id/pings", async (req, res) => {
+    const db = await getDB();
+    const vehicle = await db.collection("vehicles").findOne({ vehicle_id: req.params.id });
     if (!vehicle) return res.status(404).json(errors.vehicleNotFound);
 
-    res.json(
-        data.pings.filter(
-            p => p.vehicle_id === req.params.id
-        )
-    );
+    const pings = await db.collection("pings")
+        .find({ vehicle_id: req.params.id })
+        .toArray();
+    res.json(pings);
 });
 
-router.post("/:vehicleId/pings", (req, res) => {
+router.post("/:vehicleId/pings", async (req, res) => {
     const apiKey = req.get("X-API-Key");
 
     if (!apiKey) {
@@ -41,12 +40,13 @@ router.post("/:vehicleId/pings", (req, res) => {
     }
 
     const keyId = normalizeVehicleKeyId(req.params.vehicleId);
+    const deviceKeys = await getDeviceKeys();
 
     if (deviceKeys[keyId] !== apiKey) {
         return res.status(403).json(errors.invalidApiKey);
     }
 
-    const vehicleId = resolveVehicleId(req.params.vehicleId);
+    const vehicleId = await resolveVehicleId(req.params.vehicleId);
 
     if (!vehicleId) {
         return res.status(404).json(errors.vehicleNotFound);
@@ -58,8 +58,10 @@ router.post("/:vehicleId/pings", (req, res) => {
         return res.status(400).json({ error: "latitude, longitude, and speed are required" });
     }
 
+    const db = await getDB();
+    const count = await db.collection("pings").countDocuments();
     const ping = {
-        ping_id: `PG${String(data.pings.length + 1).padStart(4, "0")}`,
+        ping_id: `PG${String(count + 1).padStart(4, "0")}`,
         vehicle_id: vehicleId,
         latitude,
         longitude,
@@ -67,7 +69,7 @@ router.post("/:vehicleId/pings", (req, res) => {
         timestamp: new Date().toISOString()
     };
 
-    data.pings.push(ping);
+    await db.collection("pings").insertOne(ping);
 
     res.set("Location", `/vehicles/${req.params.vehicleId}/pings/${ping.ping_id}`);
     res.set("ETag", `"${ping.ping_id}"`);
@@ -76,13 +78,12 @@ router.post("/:vehicleId/pings", (req, res) => {
     return res.status(201).json(ping);
 });
 
-router.get("/:id/last-position", (req, res) => {
-    const vehicle = data.vehicles.find(
-        v => v.vehicle_id === req.params.id
-    );
+router.get("/:id/last-position", async (req, res) => {
+    const db = await getDB();
+    const vehicle = await db.collection("vehicles").findOne({ vehicle_id: req.params.id });
     if (!vehicle) return res.status(404).json(errors.vehicleNotFound);
 
-    res.json(lastPing(req.params.id));
+    res.json(await lastPing(req.params.id));
 });
 
 module.exports = router;

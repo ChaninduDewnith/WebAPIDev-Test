@@ -1,6 +1,22 @@
-const fs = require("fs");
+const { connectDB } = require("./db");
 
-const data = JSON.parse(fs.readFileSync("./seed.json", "utf8"));
+let db;
+
+async function getDB() {
+    if (!db) db = await connectDB();
+    return db;
+}
+
+async function getDeviceKeys() {
+    const _db = await getDB();
+    const vehicles = await _db.collection("vehicles").find().toArray();
+    return Object.fromEntries(
+        vehicles.map(vehicle => {
+            const keyId = normalizeVehicleKeyId(vehicle.vehicle_id);
+            return [keyId, `key_${keyId.replace("-", "")}`];
+        })
+    );
+}
 
 function normalizeVehicleKeyId(vehicleId) {
     const suffixMatch = vehicleId.match(/^v-?0*(\d+)$/i);
@@ -16,28 +32,24 @@ function normalizeVehicleKeyId(vehicleId) {
     return vehicleId;
 }
 
-const deviceKeys = Object.fromEntries(
-    data.vehicles.map(vehicle => {
-        const keyId = normalizeVehicleKeyId(vehicle.vehicle_id);
-        return [keyId, `key_${keyId.replace("-", "")}`];
-    })
-);
-
-function lastPing(vehicleId) {
-    const pings = data.pings
-        .filter(p => p.vehicle_id === vehicleId)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
+async function lastPing(vehicleId) {
+    const _db = await getDB();
+    const pings = await _db.collection("pings")
+        .find({ vehicle_id: vehicleId })
+        .sort({ timestamp: -1 })
+        .limit(1)
+        .toArray();
     return pings[0] || null;
 }
 
-function resolveVehicleId(vehicleId) {
-    const directMatch = data.vehicles.find(v => v.vehicle_id === vehicleId);
-    if (directMatch) return directMatch.vehicle_id;
+async function resolveVehicleId(vehicleId) {
+    const _db = await getDB();
+    const vehicle = await _db.collection("vehicles").findOne({ vehicle_id: vehicleId });
+    if (vehicle) return vehicle.vehicle_id;
 
     const normalizedKeyId = normalizeVehicleKeyId(vehicleId);
-    const fallbackMatch = data.vehicles.find(v => normalizeVehicleKeyId(v.vehicle_id) === normalizedKeyId);
-
+    const allVehicles = await _db.collection("vehicles").find().toArray();
+    const fallbackMatch = allVehicles.find(v => normalizeVehicleKeyId(v.vehicle_id) === normalizedKeyId);
     return fallbackMatch ? fallbackMatch.vehicle_id : null;
 }
 
@@ -72,9 +84,9 @@ function basicAuth(req, res, next) {
 }
 
 module.exports = {
-    data,
+    getDB,
+    getDeviceKeys,
     normalizeVehicleKeyId,
-    deviceKeys,
     lastPing,
     resolveVehicleId,
     errors,
