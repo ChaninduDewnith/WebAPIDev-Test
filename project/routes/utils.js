@@ -1,21 +1,12 @@
 const { connectDB } = require("./db");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 let db;
 
 async function getDB() {
     if (!db) db = await connectDB();
     return db;
-}
-
-async function getDeviceKeys() {
-    const _db = await getDB();
-    const vehicles = await _db.collection("vehicles").find().toArray();
-    return Object.fromEntries(
-        vehicles.map(vehicle => {
-            const keyId = normalizeVehicleKeyId(vehicle.vehicle_id);
-            return [keyId, `key_${keyId.replace("-", "")}`];
-        })
-    );
 }
 
 function normalizeVehicleKeyId(vehicleId) {
@@ -62,33 +53,29 @@ const errors = {
     invalidApiKey: { error: "Invalid API key" }
 };
 
-function basicAuth(req, res, next) {
-    if (req.method !== "GET") return next();
-
+function authenticateToken(req, res, next) {
     const authHeader = req.get("Authorization");
 
-    if (!authHeader) {
-        res.set("WWW-Authenticate", 'Basic realm="Police API"');
-        return res.status(401).json({ error: "Authorization header is required" });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Authorization header with Bearer token is required" });
     }
 
-    const base64Credentials = authHeader.split(" ")[1];
-    const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
-    const [username, password] = credentials.split(":");
+    const token = authHeader.split(" ")[1];
 
-    if (username !== "police" || password !== "nibm2024") {
-        return res.status(403).json({ error: "Invalid credentials" });
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (err) {
+        return res.status(403).json({ error: "Invalid or expired token" });
     }
-
-    next();
 }
 
 module.exports = {
     getDB,
-    getDeviceKeys,
     normalizeVehicleKeyId,
     lastPing,
     resolveVehicleId,
     errors,
-    basicAuth
+    authenticateToken
 };

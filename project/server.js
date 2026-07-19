@@ -1,5 +1,6 @@
 const express = require("express");
-const { basicAuth } = require("./routes/utils");
+const { authenticateToken } = require("./routes/utils");
+const authRouter = require("./routes/auth");
 const provincesRouter = require("./routes/provinces");
 const districtsRouter = require("./routes/districts");
 const stationsRouter = require("./routes/stations");
@@ -8,7 +9,8 @@ const vehiclesRouter = require("./routes/vehicles");
 const app = express();
 
 app.use(express.json());
-app.use(basicAuth);
+app.use("/auth", authRouter);
+app.use(authenticateToken);
 app.use("/provinces", provincesRouter);
 app.use("/districts", districtsRouter);
 app.use("/stations", stationsRouter);

@@ -1,5 +1,5 @@
 const express = require("express");
-const { getDB, getDeviceKeys, normalizeVehicleKeyId, lastPing, resolveVehicleId, errors } = require("./utils");
+const { getDB, normalizeVehicleKeyId, lastPing, resolveVehicleId, errors } = require("./utils");
 
 const router = express.Router();
 
@@ -33,19 +33,6 @@ router.get("/:id/pings", async (req, res) => {
 });
 
 router.post("/:vehicleId/pings", async (req, res) => {
-    const apiKey = req.get("X-API-Key");
-
-    if (!apiKey) {
-        return res.status(401).json(errors.missingApiKey);
-    }
-
-    const keyId = normalizeVehicleKeyId(req.params.vehicleId);
-    const deviceKeys = await getDeviceKeys();
-
-    if (deviceKeys[keyId] !== apiKey) {
-        return res.status(403).json(errors.invalidApiKey);
-    }
-
     const vehicleId = await resolveVehicleId(req.params.vehicleId);
 
     if (!vehicleId) {
