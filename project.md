@@ -11,7 +11,7 @@ The system helps stakeholders view the operational areas of tuk-tuks and track t
 - Resource IDs in the data are represented as string values such as `P001`, `D001`, `S001`, `V001`.
 - Route names follow REST-style conventions using lowercase nouns and hyphen-separated path segments.
 - Pings are POSTed to a vehicle and stored in memory (not persisted to disk).
-- Authentication via `X-API-Key` header is required for write operations.
+- Authentication via JWT (JSON Web Token) is required for all routes except `/auth/login`.
 
 ## 3. Tech Stack
 - **Runtime**: Node.js
@@ -61,18 +61,36 @@ The API works with the following resource types:
 
 ## 5. Authentication
 
-Write endpoints require an `X-API-Key` header. Each vehicle has a unique API key derived from its ID.
+All routes (except `POST /auth/login`) require a valid JWT sent via the `Authorization` header.
 
-Device key mapping (built at startup):
+### Login
+
+`POST /auth/login` accepts `username` and `password` in the request body and returns a signed JWT.
+
+| Credential | Value |
+|---|---|
+| username | `police` |
+| password | `nibm2024` |
+
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
 ```
-{ "v-01": "key_v01", "v-02": "key_v02", ..., "v-50": "key_v50" }
+
+### Authenticated requests
+
+Include the token in the `Authorization` header:
+
+```
+Authorization: Bearer <token>
 ```
 
 | Status | Condition |
 |---|---|
-| 401 | `X-API-Key` header is absent |
-| 404 | Vehicle ID does not exist in the vehicles array (checked before key validation) |
-| 403 | Provided key does not match the vehicle's expected key |
+| 401 | `Authorization` header is absent or does not start with `Bearer ` |
+| 403 | Token is invalid or expired |
 
 ## 6. API Routes
 
@@ -109,7 +127,7 @@ Device key mapping (built at startup):
 Creates a new location ping for a vehicle.
 
 **Request headers:**
-- `X-API-Key` (required) — the vehicle's device key
+- `Authorization: Bearer <token>` (required)
 - `Content-Type: application/json`
 
 **Request body:**
@@ -125,9 +143,9 @@ Creates a new location ping for a vehicle.
 
 | Status | Condition |
 |---|---|
-| 401 | `X-API-Key` header is absent |
+| 401 | `Authorization` header is absent or malformed |
+| 403 | Token is invalid or expired |
 | 404 | `:vehicleId` does not match any vehicle in the system |
-| 403 | `X-API-Key` does not match `deviceKeys[vehicleId]` |
 | 400 | Body missing `latitude`, `longitude`, or `speed` |
 | 201 | Ping created successfully |
 
@@ -145,21 +163,22 @@ Headers: `Location: /vehicles/:vehicleId/pings/:pingId`, `ETag: "<ping_id>"`, `L
 }
 ```
 
-## 8. Device Key Generation
+## 8. ID Normalization
 
-Keys are generated from vehicle IDs at server startup:
+The `normalizeVehicleKeyId` function converts various ID formats (`V001`, `v-01`, `v001`, `V1`) to a canonical `v-NN` form:
 
 ```
-normalizeVehicleKeyId("V001") → "v-01" → deviceKey = "key_v01"
-normalizeVehicleKeyId("V050") → "v-50" → deviceKey = "key_v50"
+normalizeVehicleKeyId("V001") → "v-01"
+normalizeVehicleKeyId("V050") → "v-50"
 ```
 
-The normalization function accepts various input formats (`V001`, `v-01`, `v001`, `V1`) and converts them to a canonical `v-NN` form.
+This is used by `resolveVehicleId` to match vehicles across different ID formats.
 
 ## 9. Helper Functions
 
 | Function | Purpose |
 |---|---|
+| `authenticateToken(req, res, next)` | JWT middleware — verifies `Authorization: Bearer <token>` |
 | `normalizeVehicleKeyId(id)` | Converts vehicle ID to canonical `v-NN` format |
 | `resolveVehicleId(id)` | Resolves various ID formats to the actual `vehicle_id` in data |
 | `lastPing(vehicleId)` | Returns the most recent ping for a vehicle (sorted by timestamp descending) |
@@ -170,5 +189,6 @@ The normalization function accepts various input formats (`V001`, `v-01`, `v001`
 3. Implement collection routes for provinces, districts, stations, and vehicles.
 4. Implement member routes for each resource using path parameters.
 5. Implement the vehicle ping read route.
-6. Implement `deviceKeys` generation and the POST ping endpoint with auth.
-7. Test the API with sample requests using `curl` or a browser.
+6. Implement `POST /auth/login` and JWT middleware.
+7. Implement the POST ping endpoint.
+8. Test the API with sample requests using `curl` or a browser.
