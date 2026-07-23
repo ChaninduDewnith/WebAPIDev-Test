@@ -4,7 +4,7 @@ require("dotenv").config();
 
 async function seedDatabase() {
     try {
-        await mongoose.connect(`mongodb://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_HOST}/${process.env.MONGO_DATABASE}?ssl=true&replicaSet=${process.env.MONGO_REPLICA_SET}&authSource=admin&retryWrites=true&w=majority`);
+        await mongoose.connect(`mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@cluster0.i8joo4s.mongodb.net/`);
         
         const data = JSON.parse(
             fs.readFileSync("seed.json", "utf8")
